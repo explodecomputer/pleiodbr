@@ -1,0 +1,24 @@
+Package: pleiodbr
+Title: Read pleiodb GWAS Databases from R
+Version: 0.1.0
+Authors@R:
+    person("Gibran", "Hemani", email = "g.hemani@bristol.ac.uk",
+           role = c("aut", "cre"))
+Description: Self-contained reader for .pleiodb binary databases of GWAS
+    z-scores. Provides PheWAS, GWAS, top-hits, block, and rho queries with
+    no Python dependency. Databases are built with the Python pleiodb package.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Imports:
+    zstd,
+    tibble,
+    dplyr,
+    jsonlite
+Suggests:
+    testthat (>= 3.0.0),
+    withr
+Config/testthat/edition: 3
+URL: https://github.com/explodecomputer/pleiodbr
+BugReports: https://github.com/explodecomputer/pleiodbr/issues
