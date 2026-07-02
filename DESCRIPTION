@@ -18,7 +18,14 @@ Imports:
     jsonlite
 Suggests:
     testthat (>= 3.0.0),
-    withr
+    withr,
+    knitr,
+    rmarkdown,
+    ggplot2,
+    ggrepel,
+    tidyr,
+    TwoSampleMR
 Config/testthat/edition: 3
+VignetteBuilder: knitr
 URL: https://github.com/explodecomputer/pleiodbr
 BugReports: https://github.com/explodecomputer/pleiodbr/issues
