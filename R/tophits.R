@@ -6,8 +6,10 @@
 #' @param db A `pleiodb` object from [open_pleiodb()].
 #' @param traits Character vector of OpenGWAS trait IDs. Required.
 #' @param pval P-value threshold (default `5e-8`). The database stores
-#'   pre-built masks for `5e-8` and `1e-5`; other thresholds trigger a
-#'   full-column scan.
+#'   pre-built masks for `5e-8` and `1e-5`. Any threshold that is more
+#'   stringent than an available mask (e.g. `1e-6` uses the `1e-5` mask with
+#'   a subsequent filter). Thresholds less stringent than all masks (e.g.
+#'   `1e-4`) trigger a full-column scan.
 #' @return A tibble with columns `variant_id`, `trait_id`, `z`, `beta`, `se`,
 #'   `pval`, `eaf`, `n`, `imputed`.
 #' @export
@@ -29,28 +31,21 @@ tophits <- function(db, traits, pval = 5e-8) {
     stop("Traits not found in database: ", paste(missing_t, collapse = ", "))
   t_idx <- t_idx - 1L   # 0-based
 
-  imp_coo <- .load_imputed_coo(db)
-  coo     <- .load_sig_coo(db, pval)
+  coo <- .load_sig_coo(db, pval)
 
   if (!is.null(coo)) {
-    # Use pre-built mask — filter to requested traits
     keep <- coo[, 2L] %in% t_idx
     coo  <- coo[keep, , drop = FALSE]
     if (nrow(coo) == 0L)
       return(.empty_tibble())
 
-    # Fetch z-scores for each pair
-    z_vals <- vapply(seq_len(nrow(coo)), function(i) {
-      .get_block(db, "zscore", coo[i, 1L], coo[i, 1L] + 1L,
-                 coo[i, 2L], coo[i, 2L] + 1L)[1L, 1L]
-    }, numeric(1L))
+    z_vals <- .fetch_for_pairs(db, "zscore", coo[, 1L], coo[, 2L])
 
     keep2 <- !is.na(z_vals) & abs(z_vals) >= qnorm(pval / 2, lower.tail = FALSE)
     if (!any(keep2)) return(.empty_tibble())
 
-    .build_tibble(coo[keep2, 1L], coo[keep2, 2L], z_vals[keep2], db, imp_coo)
+    .build_tibble(coo[keep2, 1L], coo[keep2, 2L], z_vals[keep2], db)
   } else {
-    # Fallback: scan each requested trait column
     z_thresh <- qnorm(pval / 2, lower.tail = FALSE)
     rows <- vector("list", length(t_idx))
     for (i in seq_along(t_idx)) {
@@ -59,7 +54,7 @@ tophits <- function(db, traits, pval = 5e-8) {
       keep  <- which(!is.na(z_col) & abs(z_col) >= z_thresh)
       if (length(keep) == 0L) next
       rows[[i]] <- .build_tibble(keep - 1L, rep(ti, length(keep)),
-                                 z_col[keep], db, imp_coo)
+                                 z_col[keep], db)
     }
     dplyr::bind_rows(rows)
   }

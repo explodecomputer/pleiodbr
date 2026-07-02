@@ -32,6 +32,12 @@
       <ul class="navbar-nav me-auto">
 <li class="nav-item"><a class="nav-link" href="articles/pleiodbr.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
+<li><a class="dropdown-item" href="articles/benchmarks.html">Query benchmarks</a></li>
+  </ul>
+</li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><a class="external-link nav-link" href="https://github.com/explodecomputer/pleiodbr" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
@@ -166,9 +172,22 @@
 <p>A <code>.pleiodb</code> directory stores a V×T matrix of GWAS z-scores (variants × traits) as zstd-compressed 512×512 int16 chunks. It also stores effective sample sizes (Neff), pairwise phenotypic correlations (rho), and optional imputed z-scores produced by LD reference completion. The Python <code>pleiodb</code> package builds these databases from OpenGWAS VCF files.</p>
 </div>
 <div class="section level2">
-<h2 id="vignette">Vignette<a class="anchor" aria-label="anchor" href="#vignette"></a>
+<h2 id="vignettes">Vignettes<a class="anchor" aria-label="anchor" href="#vignettes"></a>
 </h2>
-<p>See <code><a href="articles/pleiodbr.html">vignette("pleiodbr")</a></code> for a full walkthrough including Manhattan plots, PheWAS plots, and a Mendelian randomisation example.</p>
+<ul>
+<li>
+<code><a href="articles/pleiodbr.html">vignette("pleiodbr")</a></code> — full walkthrough with Manhattan plots, PheWAS plots, and a Mendelian randomisation example.</li>
+<li>
+<code><a href="articles/benchmarks.html">vignette("benchmarks")</a></code> — wall-clock timings for every query type and a guide to what drives performance.</li>
+</ul>
+<div class="section level3">
+<h3 id="building-vignettes-locally">Building vignettes locally<a class="anchor" aria-label="anchor" href="#building-vignettes-locally"></a>
+</h3>
+<p>Vignettes require a live <code>.pleiodb</code> database. The easiest way to set up the environment is via <a href="https://mamba.readthedocs.io/" class="external-link">mamba</a>:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="ex">mamba</span> env create <span class="at">-f</span> environment.yml</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="ex">mamba</span> run <span class="at">-n</span> pleiodbr Rscript setup.R</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="ex">mamba</span> run <span class="at">-n</span> pleiodbr Rscript <span class="at">-e</span> <span class="st">"devtools::build_vignettes()"</span></span></code></pre></div>
+</div>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">

@@ -30,12 +30,10 @@ gwas <- function(db, trait_id) {
       pval = numeric(), eaf = numeric(), n = numeric(), imputed = logical()
     ))
 
-  imp_coo <- .load_imputed_coo(db)
   .build_tibble(
-    v_idx       = keep - 1L,
-    t_idx       = rep(ti, length(keep)),
-    z_vals      = z_col[keep],
-    db          = db,
-    imputed_coo = imp_coo
+    v_idx  = keep - 1L,
+    t_idx  = rep(ti, length(keep)),
+    z_vals = z_col[keep],
+    db     = db
   )
 }

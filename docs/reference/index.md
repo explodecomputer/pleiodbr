@@ -23,3 +23,14 @@ pval, eaf, n, imputed.
 
 - [`rho()`](https://explodecomputer.github.io/pleiodbr/reference/rho.md)
   : Rho (phenotypic correlation) query
+
+## Helpers
+
+Utilities for formatting outputs and building plots.
+
+- [`parse_alid()`](https://explodecomputer.github.io/pleiodbr/reference/parse_alid.md)
+  : Parse ALID strings into components
+- [`to_twosamplemr()`](https://explodecomputer.github.io/pleiodbr/reference/to_twosamplemr.md)
+  : Convert pleiodbr results to TwoSampleMR format
+- [`manhattan_plot()`](https://explodecomputer.github.io/pleiodbr/reference/manhattan_plot.md)
+  : Manhattan plot

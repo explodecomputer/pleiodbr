@@ -33,13 +33,13 @@ open_pleiodb <- function(path) {
   # Load variants
   variants <- utils::read.table(
     file.path(path, "variants.tsv"), header = TRUE, sep = "\t",
-    stringsAsFactors = FALSE, quote = ""
+    stringsAsFactors = FALSE, quote = "", comment.char = ""
   )
 
   # Load traits
   traits <- utils::read.table(
     file.path(path, "traits.tsv"), header = TRUE, sep = "\t",
-    stringsAsFactors = FALSE, quote = ""
+    stringsAsFactors = FALSE, quote = "", comment.char = ""
   )
 
   V  <- as.integer(meta$V)
@@ -52,6 +52,23 @@ open_pleiodb <- function(path) {
   variants$chrom <- vapply(alid_split, `[[`, "", 1L)
   pos_allele     <- vapply(alid_split, `[[`, "", 2L)
   variants$pos   <- as.integer(sub("_.*", "", pos_allele))
+
+  # Pre-load imputed COO and encode as integer keys for fast per-query lookup.
+  # Encoding: key = v_idx * T + t_idx (fits in double exactly since V*T < 2^53).
+  # This replaces the per-query paste()+%in% approach over ~2M pairs.
+  imp_path <- file.path(path, "imputed.coo.zst")
+  if (file.exists(imp_path)) {
+    raw <- readBin(imp_path, "raw", n = file.size(imp_path))
+    dec <- zstdlite::zstd_decompress(raw)
+    imp_coo <- matrix(
+      readBin(dec, "integer", n = length(dec) %/% 4L,
+              size = 4L, endian = "little"),
+      ncol = 2L, byrow = TRUE
+    )
+    imp_keys <- as.double(imp_coo[, 1L]) * T_ + as.double(imp_coo[, 2L])
+  } else {
+    imp_keys <- double(0L)
+  }
 
   db <- structure(
     list(
@@ -66,7 +83,9 @@ open_pleiodb <- function(path) {
       pval_thresholds = as.numeric(meta$pval_thresholds %||% c(5e-8, 1e-5)),
       variants        = variants,
       traits          = traits,
-      eaf             = as.numeric(variants$eaf)
+      eaf             = as.numeric(variants$eaf),
+      imp_keys        = imp_keys,
+      cidx_cache      = new.env(hash = TRUE, parent = emptyenv())
     ),
     class = "pleiodb"
   )

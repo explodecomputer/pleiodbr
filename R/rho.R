@@ -38,17 +38,13 @@ rho <- function(db, traits_1, traits_2) {
 
   pairs <- expand.grid(t1 = t1_idx, t2 = t2_idx, KEEP.OUT.ATTRS = FALSE)
 
-  # rho matrix is T×T using same chunk layout but v-dim = T, t-dim = T
-  # Temporarily override T for the rho matrix read
-  rho_db <- db
-  rho_db$V <- db$T
+  # rho is a T×T matrix with the same CV×CT chunk layout; treat the first
+  # trait dimension as "v" and the second as "t".
+  rho_db           <- db
+  rho_db$V         <- db$T
   rho_db$n_v_chunks <- db$n_t_chunks
 
-  rho_vals <- vapply(seq_len(nrow(pairs)), function(i) {
-    .get_block(rho_db, "rho",
-               pairs$t1[i], pairs$t1[i] + 1L,
-               pairs$t2[i], pairs$t2[i] + 1L)[1L, 1L]
-  }, numeric(1L))
+  rho_vals <- .fetch_for_pairs(rho_db, "rho", pairs$t1, pairs$t2)
 
   tibble::tibble(
     trait_id_1 = db$traits$trait_id[pairs$t1 + 1L],

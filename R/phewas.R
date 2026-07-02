@@ -23,21 +23,19 @@ phewas <- function(db, variant) {
   if (length(v_idx) == 0L)
     stop("No variants found for: ", variant)
 
-  imp_coo <- .load_imputed_coo(db)
   rows <- vector("list", length(v_idx))
 
   for (i in seq_along(v_idx)) {
-    vi   <- v_idx[i]
+    vi    <- v_idx[i]
     z_row <- .get_block(db, "zscore", vi, vi + 1L, 0L, db$T)[1L, ]
     keep  <- which(!is.na(z_row))
     if (length(keep) == 0L) next
 
     rows[[i]] <- .build_tibble(
-      v_idx      = rep(vi, length(keep)),
-      t_idx      = keep - 1L,
-      z_vals     = z_row[keep],
-      db         = db,
-      imputed_coo = imp_coo
+      v_idx  = rep(vi, length(keep)),
+      t_idx  = keep - 1L,
+      z_vals = z_row[keep],
+      db     = db
     )
   }
 

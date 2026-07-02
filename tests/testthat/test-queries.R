@@ -49,6 +49,22 @@ test_that("tophits returns only significant hits", {
   db  <- open_pleiodb("/local-scratch/data/pleiodb/main.pleiodb")
   res <- tophits(db, traits = "ukb-b-19953", pval = 5e-8)
   expect_true(all(res$pval <= 5e-8))
+  # Regression: chunk data is row-major; byrow=TRUE required to avoid silent
+  # transposition.  BMI has ~2000 GWS hits in the mask — a transposed read
+  # returns near-zero z-scores for almost all of them, collapsing to ~16.
+  expect_gt(nrow(res), 500L)
+})
+
+test_that("associations z-scores are at correct (variant, trait) coordinates", {
+  skip_db()
+  db  <- open_pleiodb("/local-scratch/data/pleiodb/main.pleiodb")
+  # APOE/BMI association: known GWS hit.  A transposed read returns a cell
+  # from a completely different (variant, trait) position with a near-zero z.
+  res <- associations(db,
+    variants = "19:45412079_C_T",
+    traits   = "ukb-b-19953")
+  expect_equal(nrow(res), 1L)
+  expect_gt(abs(res$z), 5.0)
 })
 
 test_that("associations returns cross-product rows", {

@@ -25,26 +25,41 @@ NEFF_FRAC <- 2048.0   # 2^11
 # ---- low-level I/O ----------------------------------------------------------
 
 .read_cidx <- function(path) {
-  # uint64 stored as 8-byte little-endian; read pairs as two uint32 and
-  # reconstruct. Safe up to 2^32 * 4 GB which covers any practical .bin file.
+  # uint64 stored as 8-byte little-endian; read pairs as two int32 and
+  # reconstruct. R does not support unsigned size-4 reads, but all practical
+  # .bin files are < 2 GB so the signed values equal the unsigned values.
   raw_bytes <- readBin(path, what = "raw", n = file.size(path))
   n <- length(raw_bytes) %/% 8L
   lo <- readBin(raw_bytes, what = "integer", n = n * 2L, size = 4L,
-                signed = FALSE, endian = "little")[seq(1L, n * 2L, 2L)]
+                endian = "little")[seq(1L, n * 2L, 2L)]
   hi <- readBin(raw_bytes, what = "integer", n = n * 2L, size = 4L,
-                signed = FALSE, endian = "little")[seq(2L, n * 2L, 2L)]
+                endian = "little")[seq(2L, n * 2L, 2L)]
   # Combine as double (safe to 2^53 bytes)
   as.double(lo) + as.double(hi) * 4294967296.0
 }
 
+# .read_raw_chunk is kept for any external callers; internal code now uses the
+# single-connection variants inside .get_block / .fetch_for_pairs.
 .read_raw_chunk <- function(bin_path, cidx, chunk_id) {
-  start <- cidx[chunk_id + 1L]        # 1-based R index
+  start <- cidx[chunk_id + 1L]
   end   <- cidx[chunk_id + 2L]
   n     <- as.integer(end - start)
   con   <- file(bin_path, open = "rb")
   on.exit(close(con))
   seek(con, where = start, origin = "start")
   readBin(con, what = "raw", n = n)
+}
+
+# Read (and cache) the chunk-index for a named matrix.
+# db$cidx_cache is an environment (reference type) so the cache survives even
+# when db is passed by value.
+.get_cidx <- function(db, name) {
+  cidx <- db$cidx_cache[[name]]
+  if (is.null(cidx)) {
+    cidx <- .read_cidx(file.path(db$path, paste0(name, ".cidx")))
+    db$cidx_cache[[name]] <- cidx
+  }
+  cidx
 }
 
 .decompress <- function(raw_bytes) {
@@ -102,9 +117,8 @@ NEFF_FRAC <- 2048.0   # 2^11
   CV <- db$CV; CT <- db$CT
   n_v_chunks <- db$n_v_chunks
 
-  bin_path  <- file.path(db$path, paste0(name, ".bin"))
-  cidx_path <- file.path(db$path, paste0(name, ".cidx"))
-  cidx <- .read_cidx(cidx_path)
+  cidx     <- .get_cidx(db, name)
+  bin_path <- file.path(db$path, paste0(name, ".bin"))
 
   vi_lo <- v_start %/% CV
   vi_hi <- (v_end - 1L) %/% CV
@@ -115,45 +129,50 @@ NEFF_FRAC <- 2048.0   # 2^11
   ncols <- t_end - t_start
   out   <- matrix(NA_real_, nrow = nrows, ncol = ncols)
 
+  # Open the .bin file once for all chunk reads in this block.
+  fh <- file(bin_path, open = "rb")
+  on.exit(close(fh))
+
   for (ti in ti_lo:ti_hi) {
     for (vi in vi_lo:vi_hi) {
       cid    <- .chunk_id(vi, ti, n_v_chunks)
       bounds <- .chunk_bounds(vi, ti, CV, CT, db$V, db$T)
-      raw    <- .read_raw_chunk(bin_path, cidx, cid)
-      dec    <- .decompress(raw)
+
+      start <- cidx[cid + 1L]
+      seek(fh, where = start, origin = "start")
+      dec <- .decompress(readBin(fh, what = "raw", n = as.integer(cidx[cid + 2L] - start)))
 
       chunk_nrows <- bounds$v1 - bounds$v0
       chunk_ncols <- bounds$t1 - bounds$t0
 
+      # byrow=TRUE: binary format is row-major (trait varies fastest within a
+      # chunk); R's matrix() default is column-major, which would transpose.
       if (name == "zscore") {
         vals <- matrix(
           .decode_z(readBin(dec, "integer", n = chunk_nrows * chunk_ncols,
                             size = 2L, signed = TRUE, endian = "little")),
-          nrow = chunk_nrows, ncol = chunk_ncols
+          nrow = chunk_nrows, ncol = chunk_ncols, byrow = TRUE
         )
       } else if (name == "neff") {
         vals <- matrix(
           .decode_neff(readBin(dec, "integer", n = chunk_nrows * chunk_ncols,
                                size = 2L, signed = FALSE, endian = "little")),
-          nrow = chunk_nrows, ncol = chunk_ncols
+          nrow = chunk_nrows, ncol = chunk_ncols, byrow = TRUE
         )
       } else if (name == "rho") {
         vals <- matrix(
           .decode_f16(readBin(dec, "integer", n = chunk_nrows * chunk_ncols,
                               size = 2L, signed = FALSE, endian = "little")),
-          nrow = chunk_nrows, ncol = chunk_ncols
+          nrow = chunk_nrows, ncol = chunk_ncols, byrow = TRUE
         )
       } else {
         stop("Unknown matrix name: ", name)
       }
 
-      # Destination rows/cols in output matrix
-      r0 <- max(v_start, bounds$v0) - v_start + 1L
-      r1 <- min(v_end,   bounds$v1) - v_start
-      c0 <- max(t_start, bounds$t0) - t_start + 1L
-      c1 <- min(t_end,   bounds$t1) - t_start
-
-      # Source rows/cols in chunk
+      r0  <- max(v_start, bounds$v0) - v_start + 1L
+      r1  <- min(v_end,   bounds$v1) - v_start
+      c0  <- max(t_start, bounds$t0) - t_start + 1L
+      c1  <- min(t_end,   bounds$t1) - t_start
       sr0 <- max(v_start, bounds$v0) - bounds$v0 + 1L
       sr1 <- min(v_end,   bounds$v1) - bounds$v0
       sc0 <- max(t_start, bounds$t0) - bounds$t0 + 1L
@@ -186,7 +205,7 @@ NEFF_FRAC <- 2048.0   # 2^11
   # Data is interleaved pairs: v0,t0,v1,t1,... so byrow=TRUE gives correct columns
   matrix(
     readBin(dec, "integer", n = length(dec) %/% 4L,
-            size = 4L, signed = FALSE, endian = "little"),
+            size = 4L, endian = "little"),
     ncol = 2L, byrow = TRUE
   )  # col1=v_idx, col2=t_idx, 0-based
 }
@@ -194,11 +213,16 @@ NEFF_FRAC <- 2048.0   # 2^11
 # ---- significance COO loader ------------------------------------------------
 
 .load_sig_coo <- function(db, pval) {
-  # Find closest pre-built mask
   thresholds <- db$pval_thresholds
-  match_thr  <- thresholds[which.min(abs(thresholds - pval))]
+  # Use the most stringent mask whose threshold is >= pval (i.e. a superset of
+  # all pval-significant pairs).  This lets any custom threshold below 1e-5 use
+  # the 1e-5 mask with a subsequent filter, avoiding a full column scan.
+  # If pval is less stringent than every available mask, fall back to scanning.
+  candidates <- thresholds[thresholds >= pval]
+  if (length(candidates) == 0L) return(NULL)
+  match_thr <- min(candidates)
+
   fname <- sprintf("masks/%.0e.coo.zst", match_thr)
-  # Normalise scientific notation to match filename (e.g. 5e-08)
   fname <- gsub("e-0*(\\d+)", "e-0\\1", fname)  # ensure two-digit exponent
   path  <- file.path(db$path, fname)
   if (!file.exists(path)) return(NULL)
@@ -206,29 +230,86 @@ NEFF_FRAC <- 2048.0   # 2^11
   dec <- zstdlite::zstd_decompress(raw)
   matrix(
     readBin(dec, "integer", n = length(dec) %/% 4L,
-            size = 4L, signed = FALSE, endian = "little"),
+            size = 4L, endian = "little"),
     ncol = 2L, byrow = TRUE
   )  # col1=v_idx, col2=t_idx, 0-based
 }
 
+# ---- chunk-batched pair reader ----------------------------------------------
+# Reads a named matrix (zscore / neff / rho) for an arbitrary set of
+# (v_idx, t_idx) pairs by grouping them into their natural chunk boundaries.
+# One chunk is decompressed per unique (v_chunk, t_chunk) combination, and all
+# pairs in that chunk are extracted in a single matrix subscript.  This
+# eliminates the O(n_pairs) file seeks that arise from calling .get_block once
+# per pair.
+
+.fetch_for_pairs <- function(db, name, v_idx, t_idx) {
+  if (length(v_idx) == 0L) return(numeric(0L))
+  CV <- db$CV; CT <- db$CT
+  n_v_chunks <- db$n_v_chunks
+
+  cidx     <- .get_cidx(db, name)
+  bin_path <- file.path(db$path, paste0(name, ".bin"))
+
+  vc  <- v_idx %/% CV
+  tc  <- t_idx %/% CT
+  cid <- tc * n_v_chunks + vc   # ti-major ordering
+
+  vals <- numeric(length(v_idx))
+
+  # Open the .bin file once for all chunk reads.
+  fh <- file(bin_path, open = "rb")
+  on.exit(close(fh))
+
+  for (cid_val in unique(cid)) {
+    sel      <- which(cid == cid_val)
+    vi_chunk <- cid_val %%  n_v_chunks
+    ti_chunk <- cid_val %/% n_v_chunks
+
+    v0 <- vi_chunk * CV;  v1 <- min((vi_chunk + 1L) * CV, db$V)
+    t0 <- ti_chunk * CT;  t1 <- min((ti_chunk + 1L) * CT, db$T)
+    nr <- v1 - v0;        nc <- t1 - t0
+
+    start <- cidx[cid_val + 1L]
+    seek(fh, where = start, origin = "start")
+    dec <- .decompress(readBin(fh, what = "raw", n = as.integer(cidx[cid_val + 2L] - start)))
+
+    chunk_vals <- if (name == "zscore") {
+      matrix(.decode_z(readBin(dec, "integer", n = nr * nc,
+                               size = 2L, signed = TRUE,  endian = "little")),
+             nrow = nr, ncol = nc, byrow = TRUE)
+    } else if (name == "neff") {
+      matrix(.decode_neff(readBin(dec, "integer", n = nr * nc,
+                                  size = 2L, signed = FALSE, endian = "little")),
+             nrow = nr, ncol = nc, byrow = TRUE)
+    } else if (name == "rho") {
+      matrix(.decode_f16(readBin(dec, "integer", n = nr * nc,
+                                 size = 2L, signed = FALSE, endian = "little")),
+             nrow = nr, ncol = nc, byrow = TRUE)
+    } else {
+      stop("Unknown matrix name: ", name)
+    }
+
+    vals[sel] <- chunk_vals[cbind(v_idx[sel] - v0 + 1L, t_idx[sel] - t0 + 1L)]
+  }
+  vals
+}
+
 # ---- shared tibble builder --------------------------------------------------
 
-.build_tibble <- function(v_idx, t_idx, z_vals, db, imputed_coo) {
-  # eaf and neff are per-variant from variants table and neff matrix
+.build_tibble <- function(v_idx, t_idx, z_vals, db) {
   eaf  <- db$eaf[v_idx + 1L]
-  neff <- vapply(seq_along(v_idx), function(i) {
-    .get_block(db, "neff", v_idx[i], v_idx[i] + 1L,
-               t_idx[i], t_idx[i] + 1L)[1, 1]
-  }, numeric(1))
+  neff <- .fetch_for_pairs(db, "neff", v_idx, t_idx)
 
   bs   <- .reconstruct_beta_se(z_vals, neff, eaf)
   pval <- 2 * pnorm(-abs(z_vals))
 
-  # imputed flag — use string keys to avoid integer overflow
-  if (nrow(imputed_coo) > 0L) {
-    imp_key  <- paste(imputed_coo[, 1L], imputed_coo[, 2L], sep = ":")
-    pair_key <- paste(v_idx, t_idx, sep = ":")
-    is_imp   <- pair_key %in% imp_key
+  # Imputed flag: db$imp_keys holds pre-encoded (v*T + t) doubles for all
+  # imputed pairs, so membership is a single vectorised %in% with no string
+  # allocation (replacing the old paste()+%in% over the full 1.95M-row COO).
+  if (length(db$imp_keys) > 0L) {
+    pair_keys <- as.double(v_idx) * db$T + as.double(t_idx)
+    is_imp    <- pair_keys %in% db$imp_keys
   } else {
     is_imp <- rep(FALSE, length(v_idx))
   }

@@ -32,19 +32,11 @@ associations <- function(db, variants, traits) {
   v_idx <- v_idx - 1L   # 0-based
   t_idx <- t_idx - 1L
 
-  imp_coo <- .load_imputed_coo(db)
-
-  # Build all pairs
-  pairs <- expand.grid(vi = v_idx, ti = t_idx, KEEP.OUT.ATTRS = FALSE)
-
-  z_vals <- vapply(seq_len(nrow(pairs)), function(i) {
-    .get_block(db, "zscore",
-               pairs$vi[i], pairs$vi[i] + 1L,
-               pairs$ti[i], pairs$ti[i] + 1L)[1L, 1L]
-  }, numeric(1L))
+  pairs  <- expand.grid(vi = v_idx, ti = t_idx, KEEP.OUT.ATTRS = FALSE)
+  z_vals <- .fetch_for_pairs(db, "zscore", pairs$vi, pairs$ti)
 
   keep <- !is.na(z_vals)
   if (!any(keep)) return(.empty_tibble())
 
-  .build_tibble(pairs$vi[keep], pairs$ti[keep], z_vals[keep], db, imp_coo)
+  .build_tibble(pairs$vi[keep], pairs$ti[keep], z_vals[keep], db)
 }

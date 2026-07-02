@@ -1,0 +1,16 @@
+name: pleiodbr
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - r-base>=4.4
+  - r-devtools
+  - r-knitr
+  - r-rmarkdown
+  - r-ggplot2
+  - r-ggrepel
+  - r-dplyr
+  - r-tibble
+  - r-tidyr
+  - r-jsonlite
+  # zstdlite is not on conda-forge; install via setup.R (see below)

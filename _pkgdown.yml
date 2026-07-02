@@ -33,9 +33,19 @@ reference:
   - title: "Phenotypic correlation"
     contents:
       - rho
+  - title: "Helpers"
+    desc: "Utilities for formatting outputs and building plots."
+    contents:
+      - parse_alid
+      - to_twosamplemr
+      - manhattan_plot
 
 articles:
   - title: "Getting started"
     navbar: ~
     contents:
       - pleiodbr
+  - title: "Benchmarks"
+    navbar: ~
+    contents:
+      - benchmarks

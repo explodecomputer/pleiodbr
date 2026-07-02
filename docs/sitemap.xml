@@ -1,6 +1,7 @@
 <urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url><loc>https://explodecomputer.github.io/pleiodbr/404.html</loc></url>
 <url><loc>https://explodecomputer.github.io/pleiodbr/LICENSE-text.html</loc></url>
+<url><loc>https://explodecomputer.github.io/pleiodbr/articles/benchmarks.html</loc></url>
 <url><loc>https://explodecomputer.github.io/pleiodbr/articles/index.html</loc></url>
 <url><loc>https://explodecomputer.github.io/pleiodbr/articles/pleiodbr.html</loc></url>
 <url><loc>https://explodecomputer.github.io/pleiodbr/authors.html</loc></url>
@@ -9,9 +10,12 @@
 <url><loc>https://explodecomputer.github.io/pleiodbr/reference/dot-get_block.html</loc></url>
 <url><loc>https://explodecomputer.github.io/pleiodbr/reference/gwas.html</loc></url>
 <url><loc>https://explodecomputer.github.io/pleiodbr/reference/index.html</loc></url>
+<url><loc>https://explodecomputer.github.io/pleiodbr/reference/manhattan_plot.html</loc></url>
 <url><loc>https://explodecomputer.github.io/pleiodbr/reference/open_pleiodb.html</loc></url>
+<url><loc>https://explodecomputer.github.io/pleiodbr/reference/parse_alid.html</loc></url>
 <url><loc>https://explodecomputer.github.io/pleiodbr/reference/phewas.html</loc></url>
 <url><loc>https://explodecomputer.github.io/pleiodbr/reference/rho.html</loc></url>
+<url><loc>https://explodecomputer.github.io/pleiodbr/reference/to_twosamplemr.html</loc></url>
 <url><loc>https://explodecomputer.github.io/pleiodbr/reference/tophits.html</loc></url>
 </urlset>
 

@@ -95,9 +95,22 @@ effective sample sizes (Neff), pairwise phenotypic correlations (rho),
 and optional imputed z-scores produced by LD reference completion. The
 Python `pleiodb` package builds these databases from OpenGWAS VCF files.
 
-## Vignette
+## Vignettes
 
-See
-[`vignette("pleiodbr")`](https://explodecomputer.github.io/pleiodbr/articles/pleiodbr.md)
-for a full walkthrough including Manhattan plots, PheWAS plots, and a
-Mendelian randomisation example.
+- [`vignette("pleiodbr")`](https://explodecomputer.github.io/pleiodbr/articles/pleiodbr.md)
+  — full walkthrough with Manhattan plots, PheWAS plots, and a Mendelian
+  randomisation example.
+- [`vignette("benchmarks")`](https://explodecomputer.github.io/pleiodbr/articles/benchmarks.md)
+  — wall-clock timings for every query type and a guide to what drives
+  performance.
+
+### Building vignettes locally
+
+Vignettes require a live `.pleiodb` database. The easiest way to set up
+the environment is via [mamba](https://mamba.readthedocs.io/):
+
+``` bash
+mamba env create -f environment.yml
+mamba run -n pleiodbr Rscript setup.R
+mamba run -n pleiodbr Rscript -e "devtools::build_vignettes()"
+```
