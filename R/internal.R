@@ -48,7 +48,7 @@ NEFF_FRAC <- 2048.0   # 2^11
 }
 
 .decompress <- function(raw_bytes) {
-  zstd::zstd_decompress(raw_bytes)
+  zstdlite::zstd_decompress(raw_bytes)
 }
 
 # ---- decode -----------------------------------------------------------------
@@ -95,6 +95,7 @@ NEFF_FRAC <- 2048.0   # 2^11
 #' @param v_start,v_end  row range [v_start, v_end)
 #' @param t_start,t_end  column range [t_start, t_end)
 #' @return numeric matrix (v_end-v_start) × (t_end-t_start), decoded
+#' @keywords internal
 .get_block <- function(db, name, v_start, v_end, t_start, t_end) {
   v_end <- min(v_end, db$V)
   t_end <- min(t_end, db$T)
@@ -181,7 +182,7 @@ NEFF_FRAC <- 2048.0   # 2^11
   path <- file.path(db$path, "imputed.coo.zst")
   if (!file.exists(path)) return(matrix(integer(0), ncol = 2L))
   raw  <- readBin(path, "raw", n = file.size(path))
-  dec  <- zstd::zstd_decompress(raw)
+  dec  <- zstdlite::zstd_decompress(raw)
   # Data is interleaved pairs: v0,t0,v1,t1,... so byrow=TRUE gives correct columns
   matrix(
     readBin(dec, "integer", n = length(dec) %/% 4L,
@@ -202,7 +203,7 @@ NEFF_FRAC <- 2048.0   # 2^11
   path  <- file.path(db$path, fname)
   if (!file.exists(path)) return(NULL)
   raw <- readBin(path, "raw", n = file.size(path))
-  dec <- zstd::zstd_decompress(raw)
+  dec <- zstdlite::zstd_decompress(raw)
   matrix(
     readBin(dec, "integer", n = length(dec) %/% 4L,
             size = 4L, signed = FALSE, endian = "little"),

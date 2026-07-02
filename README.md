@@ -16,8 +16,15 @@ tibbles.
 remotes::install_github("explodecomputer/pleiodbr")
 ```
 
-**Dependencies**: `zstd`, `tibble`, `dplyr`, `jsonlite` (all available on
-CRAN).
+The `zstdlite` dependency is on R-universe (not yet on CRAN). If you hit a
+`zstdlite` installation error, install it first:
+
+```r
+install.packages("zstdlite", repos = c("https://coolbutuseless.r-universe.dev",
+                                        "https://cloud.r-project.org"))
+```
+
+**Dependencies**: `zstdlite`, `tibble`, `dplyr`, `jsonlite`.
 
 ## Quick start
 

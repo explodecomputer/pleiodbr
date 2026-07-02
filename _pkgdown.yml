@@ -1,0 +1,41 @@
+url: https://explodecomputer.github.io/pleiodbr/
+
+template:
+  bootstrap: 5
+
+destination: docs
+
+home:
+  title: pleiodbr
+  description: R reader for pleiodb GWAS databases
+
+navbar:
+  structure:
+    left:  [intro, reference, articles]
+    right: [github]
+  components:
+    github:
+      icon: fab fa-github fa-lg
+      href: https://github.com/explodecomputer/pleiodbr
+      aria-label: GitHub
+
+reference:
+  - title: "Open a database"
+    contents:
+      - open_pleiodb
+  - title: "Queries"
+    desc: "All return a tibble with columns: variant_id, trait_id, z, beta, se, pval, eaf, n, imputed."
+    contents:
+      - phewas
+      - gwas
+      - tophits
+      - associations
+  - title: "Phenotypic correlation"
+    contents:
+      - rho
+
+articles:
+  - title: "Getting started"
+    navbar: ~
+    contents:
+      - pleiodbr
