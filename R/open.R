@@ -101,7 +101,7 @@ print.pleiodb <- function(x, ...) {
     "  format version: ", x$format_version, "\n",
     "  variants (V):   ", format(x$V, big.mark = ","), "\n",
     "  traits (T):     ", format(x$T, big.mark = ","), "\n",
-    "  chunk shape:    ", x$CV, "×", x$CT, "\n",
+    "  chunk shape:    ", x$CV, "\u00d7", x$CT, "\n",
     sep = ""
   )
   invisible(x)

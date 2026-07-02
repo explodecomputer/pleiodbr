@@ -30,3 +30,4 @@ VignetteBuilder: knitr
 URL: https://explodecomputer.github.io/pleiodbr/, https://github.com/explodecomputer/pleiodbr
 BugReports: https://github.com/explodecomputer/pleiodbr/issues
 Config/roxygen2/version: 8.0.0
+RoxygenNote: 7.3.2

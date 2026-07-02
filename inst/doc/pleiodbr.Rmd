@@ -1,0 +1,221 @@
+---
+title: "Getting started with pleiodbr"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with pleiodbr}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+db_path <- "/local-scratch/data/pleiodb/main.pleiodb"
+db_available <- dir.exists(db_path)
+knitr::opts_chunk$set(
+  collapse  = TRUE,
+  comment   = "#>",
+  eval      = db_available,
+  fig.width = 8,
+  fig.height = 4,
+  dpi       = 120
+)
+if (!db_available)
+  message("Database not found at ", db_path, " — all chunks skipped.")
+```
+
+`pleiodbr` reads `.pleiodb` databases — compact binary archives of GWAS
+z-scores across thousands of traits — directly from R.
+
+## Opening a database
+
+```{r open}
+library(pleiodbr)
+library(ggplot2)
+library(dplyr)
+
+db <- open_pleiodb("/local-scratch/data/pleiodb/main.pleiodb")
+db
+```
+
+The connection holds variant and trait tables in memory and reads z-scores
+on demand from the binary chunks.
+
+---
+
+## Parsing ALIDs
+
+`parse_alid()` splits ALID strings into chromosome, position, effect allele,
+and other allele — useful for building annotation tables or MR inputs.
+
+```{r parse-alid}
+parse_alid(c("16:53800954_C_T", "19:45412079_C_T", "2:21231524_T_C"))
+```
+
+---
+
+## PheWAS — one variant across all traits
+
+```{r phewas-run}
+# APOE ε4 proxy: near-perfect LD with rs429358
+pw <- phewas(db, "19:45412079_C_T")
+nrow(pw)
+pw
+```
+
+### PheWAS plot
+
+```{r phewas-plot, fig.height=4}
+pw_ann <- pw |>
+  left_join(db$traits[, c("trait_id", "trait_name")], by = "trait_id") |>
+  arrange(pval) |>
+  mutate(x = row_number(), log10p = -log10(pval), sig = pval < 5e-8)
+
+top_labels <- pw_ann |> filter(pval < 1e-20)
+
+ggplot(pw_ann, aes(x, log10p, colour = sig)) +
+  geom_point(size = 0.7, alpha = 0.6) +
+  geom_hline(yintercept = -log10(5e-8), linetype = "dashed", colour = "grey40") +
+  ggrepel::geom_text_repel(data = top_labels, aes(label = trait_name),
+                           size = 2.5, max.overlaps = 15) +
+  scale_colour_manual(values = c("FALSE" = "steelblue", "TRUE" = "firebrick"),
+                      guide = "none") +
+  labs(x = "Trait (ranked by p-value)", y = expression(-log[10](p)),
+       title = "PheWAS: 19:45412079_C_T (APOE region)") +
+  theme_bw(base_size = 11)
+```
+
+---
+
+## GWAS — all variants for one trait
+
+```{r gwas-run}
+bmi <- gwas(db, "ukb-b-19953")
+nrow(bmi)
+```
+
+### Manhattan plot
+
+`manhattan_plot()` handles the chromosome offsets, alternating colours, and
+optional imputed-variant highlighting automatically.
+
+```{r manhattan, fig.height=4}
+manhattan_plot(bmi, title = "Body mass index (BMI) — N ≈ 461,460")
+```
+
+---
+
+## Top hits
+
+```{r tophits}
+hits <- tophits(
+  db,
+  traits = c("ukb-b-19953", "ebi-a-GCST006867"),
+  pval   = 5e-8
+)
+hits |>
+  left_join(db$traits[, c("trait_id","trait_name")], by = "trait_id") |>
+  count(trait_name, wt = NULL)
+```
+
+---
+
+## Associations — arbitrary variant × trait block
+
+```{r assoc}
+ldl_instruments <- c(
+  "19:45412079_C_T",  # APOE region
+  "1:55014160_C_T",   # PCSK9 region
+  "2:21870368_A_G"    # APOB region
+)
+assoc <- associations(
+  db,
+  variants = ldl_instruments,
+  traits   = c("ebi-a-GCST90018961",   # LDL cholesterol
+               "ebi-a-GCST003116")     # Coronary artery disease
+)
+assoc
+```
+
+---
+
+## Mendelian randomisation: LDL → CAD
+
+`to_twosamplemr()` converts any pleiodbr result tibble directly into the
+format expected by `TwoSampleMR`.
+
+, "ebi-a-GCST90013864"
+
+```{r mr-prep}
+exposure <- tophits(db, "ukb-b-19953") |>
+  to_twosamplemr("exposure", trait_name = "BMI")
+
+outcome <- associations(db, exposure$SNP, "ebi-a-GCST90013864") |>
+  to_twosamplemr("outcome", trait_name = "Coronary artery disease")
+
+dat <- TwoSampleMR::harmonise_data(exposure, outcome, action = 1)
+res <- TwoSampleMR::mr(dat)
+res[, c("method", "nsnp", "b", "se", "pval")]
+```
+
+### MR scatter plot
+
+```{r mr-scatter, fig.width=5.5, fig.height=5}
+TwoSampleMR::mr_scatter_plot(res, dat)
+```
+
+---
+
+## Phenotypic correlation (rho)
+
+```{r rho-heatmap, fig.width=5.5, fig.height=4.5}
+library(tidyr)
+
+traits_5 <- c(
+  "ukb-b-19953",        # BMI
+  "ebi-a-GCST006867",   # Type 2 diabetes
+  "ebi-a-GCST90018961", # LDL cholesterol
+  "ebi-a-GCST003116",   # Coronary artery disease
+  "ebi-a-GCST90002412"  # LDL (larger N)
+)
+
+rho_long <- rho(db, traits_5, traits_5)
+
+labels <- db$traits |>
+  filter(trait_id %in% traits_5) |>
+  mutate(label = paste0(sub(" \\(.*", "", trait_name), "\n(", trait_id, ")")) |>
+  select(trait_id, label)
+
+rho_plot <- rho_long |>
+  left_join(labels, by = c("trait_id_1" = "trait_id")) |> rename(l1 = label) |>
+  left_join(labels, by = c("trait_id_2" = "trait_id")) |> rename(l2 = label)
+
+ggplot(rho_plot, aes(l1, l2, fill = rho)) +
+  geom_tile(colour = "white") +
+  geom_text(aes(label = round(rho, 2)), size = 3) +
+  scale_fill_gradient2(low = "#4575B4", mid = "white", high = "#D73027",
+                       midpoint = 0, limits = c(-1, 1), name = "ρ") +
+  labs(x = NULL, y = NULL, title = "Phenotypic correlations") +
+  theme_bw(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+---
+
+## Regional locus plot
+
+```{r regional, fig.height=3.5}
+fto <- phewas(db, "16:53e6-54e6") |>
+  filter(trait_id == "ukb-b-19953") |>
+  mutate(pos_mb = as.numeric(sub(".*:(\\d+)_.*", "\\1", variant_id)) / 1e6)
+
+ggplot(fto, aes(pos_mb, -log10(pval), colour = imputed, shape = imputed)) +
+  geom_point(size = 1.8, alpha = 0.85) +
+  scale_colour_manual(values = c("FALSE" = "steelblue", "TRUE" = "#E07B39"),
+                      labels = c("Observed", "Imputed")) +
+  scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 17),
+                     labels = c("Observed", "Imputed")) +
+  geom_hline(yintercept = -log10(5e-8), linetype = "dashed", colour = "grey40") +
+  labs(x = "Position on chr16 (Mb)", y = expression(-log[10](p)),
+       colour = NULL, shape = NULL,
+       title = "FTO locus — BMI (chr16:53–54 Mb)") +
+  theme_bw(base_size = 11) +
+  theme(legend.position = "bottom")
+```
