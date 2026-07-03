@@ -9,6 +9,7 @@ dependency. It supports PheWAS, GWAS, top-hits, arbitrary variant×trait block
 queries, and phenotypic correlation (rho) queries. All queries return tidy
 tibbles.
 
+
 ## Installation
 
 ```r
